@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Join VAMOZ</title>
+<meta name="description" content="You've been invited to VAMOZ: Side Quests, the app for actually doing things.">
+<meta property="og:title" content="You're invited to VAMOZ">
+<meta property="og:description" content="Side quests for real life. Do things, post proof, earn Aura.">
+<style>
+  :root { --bg: #0a0f24; --deep: #050d1a; --text: #f2f4fa; --muted: #a9b0c4; --panel: rgba(255,255,255,0.06); --stroke: rgba(10,108,255,0.35); --accent: #0a6cff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; color: var(--text);
+    background: linear-gradient(160deg, var(--bg), #000 60%, var(--deep));
+    font: 17px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; }
+  main { max-width: 440px; margin: 0 auto; padding: 56px 16px 40px; }
+  .eyebrow { color: #4d8dff; font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+  h1 { font-size: 28px; line-height: 1.2; margin: 8px 0 8px; }
+  p { color: var(--muted); margin: 0 0 24px; }
+  .step { background: var(--panel); border: 1px solid var(--stroke); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+  .step-label { color: var(--muted); font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+  .btn { display: block; width: 100%; text-align: center; text-decoration: none; font-weight: 600; font-size: 17px;
+    border-radius: 14px; padding: 14px 16px; min-height: 48px; }
+  .primary { background: var(--accent); color: #fff; }
+  .secondary { background: rgba(0,0,0,0.5); color: var(--text); border: 1px solid var(--stroke); }
+  .hint { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
+  .hidden { display: none; }
+  .loading { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">VAMOZ</div>
+  <h1 id="title">You're invited</h1>
+  <p id="lead" class="loading">Checking your device…</p>
+
+  <section id="ios" class="hidden">
+    <div class="step">
+      <div class="step-label">1. Get the beta</div>
+      <a id="testflight" class="btn primary" href="#">Get VAMOZ on TestFlight</a>
+      <p class="hint">Opens TestFlight, Apple's beta app. Install it first if you don't have it.</p>
+    </div>
+    <div class="step" id="claim-step">
+      <div class="step-label">2. Installed? Come back here</div>
+      <a id="claim" class="btn secondary" href="#">Open VAMOZ</a>
+      <p class="hint" id="claim-hint">So your friend gets credit for bringing you in.</p>
+    </div>
+  </section>
+
+  <section id="error" class="hidden">
+    <p>Something went wrong loading your invite. Refresh the page to try again.</p>
+  </section>
+</main>
+<script>
+  // Fallbacks if the routing function can't be reached (fail open: iPhones still get TestFlight).
+  const FUNCTION_URL = "https://jwfqquvafluuvzalpnhg.supabase.co/functions/v1/invite-route";
+  const FALLBACK_TESTFLIGHT_URL = ""; // set to the public TestFlight link
+  const FALLBACK_WAITLIST_URL = "";   // set to the Tally waitlist link
+
+  const params = new URLSearchParams(location.search);
+  const rawRef = (params.get("ref") || "").toLowerCase();
+  const ref = /^[a-z0-9]{6}$/.test(rawRef) ? rawRef : "";
+
+  const ua = navigator.userAgent;
+  const isIOS = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const platform = isIOS ? "ios" : (/Android/.test(ua) ? "android" : "other");
+
+  function withParams(base, extra) {
+    if (!base) return "";
+    const u = new URL(base);
+    for (const [k, v] of Object.entries(extra)) if (v) u.searchParams.set(k, v);
+    return u.toString();
+  }
+
+  function showIOS(testflightUrl, inviter, claimUrl) {
+    document.getElementById("title").textContent = inviter ? `@${inviter} invited you to VAMOZ` : "You're invited to VAMOZ";
+    const lead = document.getElementById("lead");
+    lead.classList.remove("loading");
+    lead.textContent = "Side quests for real life. Do things, post proof, earn Aura.";
+    document.getElementById("testflight").href = testflightUrl;
+    if (claimUrl) {
+      document.getElementById("claim").href = claimUrl;
+      if (inviter) document.getElementById("claim-hint").textContent = `So @${inviter} gets credit for bringing you in.`;
+    } else {
+      document.getElementById("claim-step").classList.add("hidden");
+    }
+    document.getElementById("ios").classList.remove("hidden");
+  }
+
+  function showError() {
+    document.getElementById("lead").classList.add("hidden");
+    document.getElementById("error").classList.remove("hidden");
+  }
+
+  async function route() {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 6000);
+      const res = await fetch(`${FUNCTION_URL}?platform=${platform}${ref ? `&ref=${ref}` : ""}`, { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!res.ok) throw new Error(String(res.status));
+      const r = await res.json();
+      if (r.route === "waitlist" && r.url) { location.replace(r.url); return; }
+      if (r.route === "testflight" && r.url) { showIOS(r.url, r.inviter, r.claim_url); return; }
+      throw new Error("no route");
+    } catch (e) {
+      if (isIOS && FALLBACK_TESTFLIGHT_URL) {
+        showIOS(FALLBACK_TESTFLIGHT_URL, null, ref ? `vamoz://invite?ref=${ref}` : null);
+      } else if (!isIOS && FALLBACK_WAITLIST_URL) {
+        location.replace(withParams(FALLBACK_WAITLIST_URL, { reason: "android", ref }));
+      } else {
+        showError();
+      }
+    }
+  }
+  route();
+</script>
+</body>
+</html>
