@@ -55,7 +55,7 @@
   // Fallbacks if the routing function can't be reached (fail open: iPhones still get TestFlight).
   const FUNCTION_URL = "https://jwfqquvafluuvzalpnhg.supabase.co/functions/v1/invite-route";
   const FALLBACK_TESTFLIGHT_URL = "https://testflight.apple.com/join/WVY7Khtt";
-  const FALLBACK_WAITLIST_URL = "";   // set to the Tally waitlist link
+  const FALLBACK_WAITLIST_URL = "https://tally.so/r/xVD4yv";
 
   const params = new URLSearchParams(location.search);
   const rawRef = (params.get("ref") || "").toLowerCase();
